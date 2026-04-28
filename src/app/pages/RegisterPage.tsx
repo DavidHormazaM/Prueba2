@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router";
-import { Eye, EyeOff, GraduationCap, ArrowLeft, User, Mail, Lock, MapPin, BookOpen, Check } from "lucide-react";
+import { Eye, EyeOff, GraduationCap, ArrowLeft, User, Mail, Lock, MapPin, BookOpen, Check, CreditCard, Phone } from "lucide-react";
 import { senaPrograms } from "../data/users";
 
 export function RegisterPage() {
@@ -9,11 +9,18 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState(1); // Wizard de registro en 2 pasos
   const [formData, setFormData] = useState({
-    fullName: "",
+    // Datos personales (PERSONS)
+    firstName: "",
+    lastName: "",
     email: "",
+    docType: "",
+    docNum: "",
+    phoneNum: "",
     country: "",
     program: "",
+    // Credenciales
     password: "",
     confirmPassword: "",
     acceptTerms: false,
@@ -34,17 +41,39 @@ export function RegisterPage() {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    localStorage.setItem("userName", formData.fullName);
+    const fullName = `${formData.firstName} ${formData.lastName}`;
+    localStorage.setItem("userName", fullName);
     localStorage.setItem("userRole", "student");
     localStorage.setItem("userId", Date.now().toString());
     localStorage.setItem("userProgram", formData.program);
+    localStorage.setItem("userDocType", formData.docType);
+    localStorage.setItem("userDocNum", formData.docNum);
+    localStorage.setItem("userPhone", formData.phoneNum);
     
     navigate("/dashboard");
+  };
+
+  const handleNextStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Validar campos del paso 1
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.docType || !formData.docNum) {
+      alert("Por favor completa todos los campos obligatorios");
+      return;
+    }
+    setStep(2);
   };
 
   const countries = [
     "Colombia", "Mexico", "Argentina", "Chile", "Peru", 
     "Ecuador", "Venezuela", "Bolivia", "Paraguay", "Uruguay"
+  ];
+
+  const documentTypes = [
+    { value: "CC", label: "Cedula de Ciudadania" },
+    { value: "TI", label: "Tarjeta de Identidad" },
+    { value: "CE", label: "Cedula de Extranjeria" },
+    { value: "PP", label: "Pasaporte" },
+    { value: "NIT", label: "NIT" },
   ];
 
   return (
@@ -136,192 +165,334 @@ export function RegisterPage() {
           </div>
 
           <h2 className="text-3xl font-bold text-foreground mb-2">Crear cuenta</h2>
-          <p className="text-muted-foreground mb-8">Registrate para comenzar tu evaluacion</p>
+          <p className="text-muted-foreground mb-4">Registrate para comenzar tu evaluacion</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name */}
-            <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-2">
-                Nombre Completo
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  id="fullName"
-                  type="text"
-                  placeholder="Tu nombre completo"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  required
-                  className="w-full pl-12 pr-4 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
-                />
-              </div>
+          {/* Step Indicator */}
+          <div className="flex items-center gap-2 mb-6">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${step === 1 ? 'bg-sena-green text-white' : 'bg-sena-green/10 text-sena-green'}`}>
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span>
+              Datos Personales
             </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                Correo Electronico
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="tu@correo.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className="w-full pl-12 pr-4 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
-                />
-              </div>
+            <div className="w-8 h-0.5 bg-border" />
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${step === 2 ? 'bg-sena-green text-white' : 'bg-muted text-muted-foreground'}`}>
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">2</span>
+              Credenciales
             </div>
+          </div>
 
-            {/* Country & Program Row */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Country */}
-              <div>
-                <label htmlFor="country" className="block text-sm font-medium text-foreground mb-2">
-                  Pais
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <select
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    required
-                    className="w-full pl-12 pr-4 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Seleccionar</option>
-                    {countries.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Program */}
-              <div>
-                <label htmlFor="program" className="block text-sm font-medium text-foreground mb-2">
-                  Programa
-                </label>
-                <div className="relative">
-                  <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <select
-                    id="program"
-                    value={formData.program}
-                    onChange={(e) => setFormData({ ...formData, program: e.target.value })}
-                    required
-                    className="w-full pl-12 pr-4 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Seleccionar</option>
-                    {senaPrograms.map((program) => (
-                      <option key={program} value={program}>{program}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                Contrasena
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Minimo 6 caracteres"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  minLength={6}
-                  className="w-full pl-12 pr-12 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
-                Confirmar Contrasena
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Repite tu contrasena"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  required
-                  className="w-full pl-12 pr-12 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Terms Checkbox */}
-            <div className="flex items-start gap-3 py-2">
-              <input
-                id="terms"
-                type="checkbox"
-                checked={formData.acceptTerms}
-                onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
-                required
-                className="mt-1 w-5 h-5 rounded border-border text-sena-green focus:ring-sena-green/50 cursor-pointer"
-              />
-              <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                Acepto los{" "}
-                <span className="text-sena-green hover:underline">terminos y condiciones</span>
-                {" "}y la{" "}
-                <span className="text-sena-green hover:underline">politica de privacidad</span>
-              </label>
-            </div>
-
-            {/* Submit Button */}
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-sena-green text-white py-4 rounded-xl font-semibold hover:bg-sena-green-dark transition-all shadow-lg shadow-sena-green/25 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              whileHover={{ scale: isLoading ? 1 : 1.01 }}
-              whileTap={{ scale: isLoading ? 1 : 0.99 }}
+          {/* Step 1: Datos Personales */}
+          {step === 1 && (
+            <motion.form 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleNextStep} 
+              className="space-y-4"
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                "Crear Cuenta"
-              )}
-            </motion.button>
+              {/* First Name & Last Name */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
+                    Nombres *
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      id="firstName"
+                      type="text"
+                      placeholder="Juan David"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                      required
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
+                    Apellidos *
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      id="lastName"
+                      type="text"
+                      placeholder="Perez Garcia"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      required
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
 
-            {/* Login Link */}
-            <p className="text-center text-muted-foreground">
-              Ya tienes cuenta?{" "}
-              <button
-                type="button"
-                onClick={() => navigate("/login")}
-                className="text-sena-green hover:text-sena-green-dark font-medium transition-colors"
+              {/* Email */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                  Correo Electronico *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="tu@correo.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Document Type & Number */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="docType" className="block text-sm font-medium text-foreground mb-2">
+                    Tipo de Documento *
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <select
+                      id="docType"
+                      value={formData.docType}
+                      onChange={(e) => setFormData({ ...formData, docType: e.target.value })}
+                      required
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Seleccionar</option>
+                      {documentTypes.map((doc) => (
+                        <option key={doc.value} value={doc.value}>{doc.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="docNum" className="block text-sm font-medium text-foreground mb-2">
+                    Numero de Documento *
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      id="docNum"
+                      type="text"
+                      placeholder="1234567890"
+                      value={formData.docNum}
+                      onChange={(e) => setFormData({ ...formData, docNum: e.target.value })}
+                      required
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label htmlFor="phoneNum" className="block text-sm font-medium text-foreground mb-2">
+                  Numero de Telefono
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    id="phoneNum"
+                    type="tel"
+                    placeholder="+57 300 123 4567"
+                    value={formData.phoneNum}
+                    onChange={(e) => setFormData({ ...formData, phoneNum: e.target.value })}
+                    className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Country & Program Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="country" className="block text-sm font-medium text-foreground mb-2">
+                    Pais
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <select
+                      id="country"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Seleccionar</option>
+                      {countries.map((country) => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="program" className="block text-sm font-medium text-foreground mb-2">
+                    Programa SENA
+                  </label>
+                  <div className="relative">
+                    <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <select
+                      id="program"
+                      value={formData.program}
+                      onChange={(e) => setFormData({ ...formData, program: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Seleccionar</option>
+                      {senaPrograms.map((program) => (
+                        <option key={program} value={program}>{program}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Next Button */}
+              <motion.button
+                type="submit"
+                className="w-full bg-sena-green text-white py-4 rounded-xl font-semibold hover:bg-sena-green-dark transition-all shadow-lg shadow-sena-green/25 flex items-center justify-center gap-2"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
               >
-                Iniciar sesion
-              </button>
-            </p>
-          </form>
+                Continuar
+              </motion.button>
+
+              {/* Login Link */}
+              <p className="text-center text-muted-foreground">
+                Ya tienes cuenta?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="text-sena-green hover:text-sena-green-dark font-medium transition-colors"
+                >
+                  Iniciar sesion
+                </button>
+              </p>
+            </motion.form>
+          )}
+
+          {/* Step 2: Credenciales */}
+          {step === 2 && (
+            <motion.form 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleSubmit} 
+              className="space-y-4"
+            >
+              {/* Summary Card */}
+              <div className="bg-sena-green/5 border border-sena-green/20 rounded-xl p-4 mb-2">
+                <p className="text-sm text-muted-foreground mb-1">Registrando como:</p>
+                <p className="font-semibold text-foreground">{formData.firstName} {formData.lastName}</p>
+                <p className="text-sm text-muted-foreground">{formData.email}</p>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                  Contrasena *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Minimo 6 caracteres"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    minLength={6}
+                    className="w-full pl-12 pr-12 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
+                  Confirmar Contrasena *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Repite tu contrasena"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    required
+                    className="w-full pl-12 pr-12 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 focus:border-sena-green transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Terms Checkbox */}
+              <div className="flex items-start gap-3 py-2">
+                <input
+                  id="terms"
+                  type="checkbox"
+                  checked={formData.acceptTerms}
+                  onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                  required
+                  className="mt-1 w-5 h-5 rounded border-border text-sena-green focus:ring-sena-green/50 cursor-pointer"
+                />
+                <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
+                  Acepto los{" "}
+                  <span className="text-sena-green hover:underline">terminos y condiciones</span>
+                  {" "}y la{" "}
+                  <span className="text-sena-green hover:underline">politica de privacidad</span>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="flex-1 bg-muted text-muted-foreground py-4 rounded-xl font-semibold hover:bg-muted/80 transition-all"
+                >
+                  Atras
+                </button>
+                <motion.button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 bg-sena-green text-white py-4 rounded-xl font-semibold hover:bg-sena-green-dark transition-all shadow-lg shadow-sena-green/25 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  whileHover={{ scale: isLoading ? 1 : 1.01 }}
+                  whileTap={{ scale: isLoading ? 1 : 0.99 }}
+                >
+                  {isLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Crear Cuenta"
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Login Link */}
+              <p className="text-center text-muted-foreground">
+                Ya tienes cuenta?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="text-sena-green hover:text-sena-green-dark font-medium transition-colors"
+                >
+                  Iniciar sesion
+                </button>
+              </p>
+            </motion.form>
+          )}
         </motion.div>
       </div>
     </div>

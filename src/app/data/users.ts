@@ -17,6 +17,13 @@ export interface User {
   email: string;
   password: string;
   role: UserRole;
+  // Campos PERSONS del modelo de BD
+  docType?: string;
+  docNum?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNum?: string;
+  title?: string;
   country?: string;
   program?: string;
   permissions: UserPermissions;
@@ -43,6 +50,14 @@ export interface Document {
   fileType: string;
   size: string;
   uploadedBy: string;
+  // Campos DIGITAL_DICTIONARIES del modelo de BD
+  wordId?: string;
+  definition?: string;
+  synonyms?: string;
+  audioUrl?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  level?: string;
 }
 
 export interface TestResult {

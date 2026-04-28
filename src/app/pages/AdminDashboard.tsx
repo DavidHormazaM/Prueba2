@@ -6,12 +6,19 @@ import {
   GraduationCap, BarChart3, BookOpen, Settings, X,
   Check, Filter, Eye, ToggleLeft, ToggleRight,
   FolderOpen, Download, Play, Pause, Music, Video,
-  Volume2, Film,
+  Volume2, Film, TrendingUp, PieChart, Activity, Calendar,
+  Award, Target, Zap, ChevronUp, ChevronDown,
 } from "lucide-react";
 import {
   mockUsers, User, UserPermissions, getDefaultPermissions,
   mockDocuments, Document, mockSubjects, Subject, senaPrograms,
+  mockTestResults,
 } from "../data/users";
+import {
+  AreaChart, Area, BarChart, Bar, PieChart as RechartsPie, Pie, Cell,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+} from "recharts";
 
 // ─── Tipos de archivo ────────────────────────────────────────────────────────
 type FileCategory = "document" | "audio" | "video";
@@ -115,22 +122,24 @@ function VideoPlayer({ src, name }: { src: string; name: string }) {
   );
 }
 
-// ─── Tarjeta de documento (con reproductor si es audio/video) ────────────────
+// ─── Tarjeta de documento (con reproductor si es audio/video + Digital Dict) ──
 function DocumentCard({
   doc,
   subjects,
   onDelete,
   onAssign,
 }: {
-  doc: Document & { objectUrl?: string; category?: FileCategory };
+  doc: Document & { objectUrl?: string; category?: FileCategory; definition?: string; synonyms?: string; level?: string };
   subjects: Subject[];
   onDelete: (id: string) => void;
   onAssign: (id: string, subjectId: string) => void;
 }) {
   const [showPlayer, setShowPlayer] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const cat: FileCategory = doc.category ?? getFileCategory(doc.name);
   const meta = categoryMeta(cat);
   const Icon = meta.icon;
+  const hasDigitalDictInfo = doc.definition || doc.synonyms || doc.level;
 
   return (
     <motion.div
@@ -174,12 +183,21 @@ function DocumentCard({
         </div>
       </div>
 
-      {/* Nombre y badge */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* Nombre y badges */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <h4 className="font-semibold text-foreground line-clamp-1 flex-1">{doc.name}</h4>
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>
           {meta.label}
         </span>
+        {doc.level && (
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+            doc.level.startsWith('C') ? 'bg-sena-green/10 text-sena-green' :
+            doc.level.startsWith('B') ? 'bg-sena-blue/10 text-sena-blue' :
+            'bg-warning/10 text-warning'
+          }`}>
+            {doc.level}
+          </span>
+        )}
       </div>
 
       {/* Meta info */}
@@ -194,6 +212,48 @@ function DocumentCard({
           <span>{doc.uploadedAt}</span>
         </div>
       </div>
+
+      {/* Digital Dictionary Info */}
+      {hasDigitalDictInfo && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="flex items-center gap-2 text-sm text-sena-green hover:text-sena-green-dark transition-colors font-medium"
+          >
+            <BookOpen className="w-4 h-4" />
+            {showDetails ? 'Ocultar detalles' : 'Ver detalles del diccionario'}
+          </button>
+          <AnimatePresence>
+            {showDetails && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 p-3 bg-sena-green/5 rounded-xl border border-sena-green/20 space-y-2 overflow-hidden"
+              >
+                {doc.definition && (
+                  <div>
+                    <p className="text-xs font-semibold text-sena-green mb-1">Definicion:</p>
+                    <p className="text-sm text-foreground">{doc.definition}</p>
+                  </div>
+                )}
+                {doc.synonyms && (
+                  <div>
+                    <p className="text-xs font-semibold text-sena-green mb-1">Sinonimos:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {doc.synonyms.split(',').map((syn, i) => (
+                        <span key={i} className="text-xs bg-white px-2 py-0.5 rounded-full border border-sena-green/30 text-foreground">
+                          {syn.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Reproductor inline (audio o video) */}
       <AnimatePresence>
@@ -229,11 +289,15 @@ function DocumentCard({
 }
 
 // ─── Tipos aumentados ────────────────────────────────────────────────────────
-type TabType = "overview" | "users" | "documents" | "subjects";
+type TabType = "overview" | "users" | "documents" | "subjects" | "analytics";
 
 type ExtendedDocument = Document & {
   objectUrl?: string;
   category?: FileCategory;
+  // Campos adicionales para Digital Dictionaries
+  definition?: string;
+  synonyms?: string;
+  level?: string;
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -270,6 +334,10 @@ export function AdminDashboard() {
     subjectId: "",
     program: "",
     previewUrl: "",
+    // Campos Digital Dictionaries
+    definition: "",
+    synonyms: "",
+    level: "",
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -337,7 +405,7 @@ export function AdminDashboard() {
     setUploadForm({ ...uploadForm, file, previewUrl: url });
   };
 
-  // ── Subir archivo (ahora con objectUrl y category) ────────────────────────
+  // ── Subir archivo (ahora con objectUrl y category + Digital Dictionaries) ──
   const handleFileUpload = (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadForm.file) return;
@@ -358,11 +426,15 @@ export function AdminDashboard() {
       // Campos nuevos
       objectUrl: uploadForm.previewUrl,
       category: cat,
+      // Digital Dictionaries
+      definition: uploadForm.definition || undefined,
+      synonyms: uploadForm.synonyms || undefined,
+      level: uploadForm.level || undefined,
     };
 
     setDocuments([...documents, newDoc]);
     setShowUploadModal(false);
-    setUploadForm({ file: null, subjectId: "", program: "", previewUrl: "" });
+    setUploadForm({ file: null, subjectId: "", program: "", previewUrl: "", definition: "", synonyms: "", level: "" });
   };
 
   const handleDeleteDocument = (docId: string) => {
@@ -399,10 +471,11 @@ export function AdminDashboard() {
   };
 
   const tabs = [
-    { id: "overview",   label: "Resumen",     icon: BarChart3  },
-    { id: "users",      label: "Usuarios",    icon: Users      },
-    { id: "documents",  label: "Documentos",  icon: FileText   },
-    { id: "subjects",   label: "Asignaturas", icon: BookOpen   },
+    { id: "overview",   label: "Resumen",       icon: BarChart3  },
+    { id: "analytics",  label: "Estadisticas",  icon: PieChart   },
+    { id: "users",      label: "Usuarios",      icon: Users      },
+    { id: "documents",  label: "Documentos",    icon: FileText   },
+    { id: "subjects",   label: "Asignaturas",   icon: BookOpen   },
   ];
 
   // ── Preview dentro del modal ───────────────────────────────────────────────
@@ -575,6 +648,327 @@ export function AdminDashboard() {
                     <button onClick={() => setActiveTab("documents")} className="flex items-center gap-2 p-3 bg-muted text-muted-foreground rounded-xl hover:bg-muted/80 transition-all font-medium text-sm">
                       <Settings className="w-4 h-4" /> Gestionar
                     </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══ Analytics - Panel de Estadísticas Avanzadas ══ */}
+          {activeTab === "analytics" && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Panel de Estadisticas</h2>
+                <p className="text-muted-foreground">Analisis detallado del rendimiento de la plataforma</p>
+              </div>
+
+              {/* KPIs principales */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Promedio General", value: `${Math.round(mockTestResults.reduce((a, r) => a + r.score, 0) / mockTestResults.length)}%`, icon: Target, color: "sena-green", trend: "+5.2%", up: true },
+                  { label: "Pruebas Completadas", value: mockTestResults.length, icon: Award, color: "sena-blue", trend: "+12", up: true },
+                  { label: "Estudiantes Activos", value: users.filter(u => u.role === 'student' && u.status === 'active').length, icon: Users, color: "warning", trend: "+3", up: true },
+                  { label: "Tasa de Aprobacion", value: `${Math.round((mockTestResults.filter(r => r.score >= 60).length / mockTestResults.length) * 100)}%`, icon: Zap, color: "destructive", trend: "+2.1%", up: true },
+                ].map((kpi, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="bg-white rounded-2xl p-5 border border-border shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`w-11 h-11 bg-${kpi.color}/10 rounded-xl flex items-center justify-center`}>
+                        <kpi.icon className={`w-5 h-5 text-${kpi.color}`} />
+                      </div>
+                      <div className={`flex items-center gap-1 text-xs font-medium ${kpi.up ? 'text-sena-green' : 'text-destructive'}`}>
+                        {kpi.up ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        {kpi.trend}
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                    <p className="text-sm text-muted-foreground">{kpi.label}</p>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Gráficos principales */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Rendimiento por Nivel */}
+                <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Distribucion por Nivel</h3>
+                      <p className="text-sm text-muted-foreground">Clasificacion de estudiantes</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Ultimo mes</span>
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie>
+                        <Pie
+                          data={[
+                            { name: 'Basico (A1-A2)', value: mockTestResults.filter(r => r.level.startsWith('A')).length, color: '#E21B3C' },
+                            { name: 'Intermedio (B1-B2)', value: mockTestResults.filter(r => r.level.startsWith('B')).length, color: '#D89E00' },
+                            { name: 'Avanzado (C1-C2)', value: mockTestResults.filter(r => r.level.startsWith('C')).length, color: '#39A900' },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={5}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {[
+                            { name: 'Basico', color: '#E21B3C' },
+                            { name: 'Intermedio', color: '#D89E00' },
+                            { name: 'Avanzado', color: '#39A900' },
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Tendencia de puntuaciones */}
+                <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Tendencia de Puntuaciones</h3>
+                      <p className="text-sm text-muted-foreground">Promedio mensual de calificaciones</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-sena-green/10 text-sena-green rounded-lg">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-sm font-medium">+12%</span>
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={[
+                        { mes: 'Ene', promedio: 65, estudiantes: 12 },
+                        { mes: 'Feb', promedio: 68, estudiantes: 18 },
+                        { mes: 'Mar', promedio: 72, estudiantes: 24 },
+                        { mes: 'Abr', promedio: 75, estudiantes: 32 },
+                      ]}>
+                        <defs>
+                          <linearGradient id="colorPromedio" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#39A900" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#39A900" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="mes" stroke="#9ca3af" fontSize={12} />
+                        <YAxis stroke="#9ca3af" fontSize={12} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e5e7eb' }}
+                        />
+                        <Area type="monotone" dataKey="promedio" stroke="#39A900" strokeWidth={2} fillOpacity={1} fill="url(#colorPromedio)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Segunda fila de gráficos */}
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Rendimiento por Programa */}
+                <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Rendimiento por Programa SENA</h3>
+                      <p className="text-sm text-muted-foreground">Comparativa de promedios por carrera</p>
+                    </div>
+                  </div>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { programa: 'Desarrollo', promedio: 78, estudiantes: 45 },
+                        { programa: 'Analisis', promedio: 72, estudiantes: 32 },
+                        { programa: 'Redes', promedio: 68, estudiantes: 28 },
+                        { programa: 'Diseno', promedio: 82, estudiantes: 20 },
+                        { programa: 'Marketing', promedio: 75, estudiantes: 15 },
+                      ]} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis type="number" domain={[0, 100]} stroke="#9ca3af" fontSize={12} />
+                        <YAxis dataKey="programa" type="category" stroke="#9ca3af" fontSize={12} width={80} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e5e7eb' }}
+                          formatter={(value, name) => [name === 'promedio' ? `${value}%` : value, name === 'promedio' ? 'Promedio' : 'Estudiantes']}
+                        />
+                        <Bar dataKey="promedio" fill="#1F4E78" radius={[0, 8, 8, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Radar de competencias */}
+                <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-foreground">Competencias</h3>
+                    <p className="text-sm text-muted-foreground">Promedio por habilidad</p>
+                  </div>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={[
+                        { skill: 'Grammar', value: 75 },
+                        { skill: 'Vocabulary', value: 82 },
+                        { skill: 'Reading', value: 78 },
+                        { skill: 'Listening', value: 70 },
+                        { skill: 'Writing', value: 65 },
+                      ]}>
+                        <PolarGrid stroke="#e5e7eb" />
+                        <PolarAngleAxis dataKey="skill" stroke="#9ca3af" fontSize={11} />
+                        <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#9ca3af" fontSize={10} />
+                        <Radar name="Promedio" dataKey="value" stroke="#39A900" fill="#39A900" fillOpacity={0.3} strokeWidth={2} />
+                        <Tooltip />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabla de mejores estudiantes */}
+              <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-foreground">Top Estudiantes</h3>
+                    <p className="text-sm text-muted-foreground">Mejores calificaciones del periodo</p>
+                  </div>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-muted text-muted-foreground rounded-xl hover:bg-muted/80 transition-all text-sm font-medium">
+                    <Download className="w-4 h-4" />
+                    Exportar
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Posicion</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Estudiante</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Programa</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Puntuacion</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Nivel</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Tendencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mockTestResults
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, 5)
+                        .map((result, index) => {
+                          const student = users.find(u => u.id === result.userId);
+                          return (
+                            <tr key={result.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                              <td className="py-4 px-4">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                  index === 1 ? 'bg-gray-100 text-gray-700' :
+                                  index === 2 ? 'bg-orange-100 text-orange-700' :
+                                  'bg-muted text-muted-foreground'
+                                }`}>
+                                  {index + 1}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-sena-green rounded-xl flex items-center justify-center text-white font-medium">
+                                    {result.userName.charAt(0)}
+                                  </div>
+                                  <span className="font-medium text-foreground">{result.userName}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-sm text-muted-foreground">{student?.program || 'N/A'}</td>
+                              <td className="py-4 px-4">
+                                <span className={`text-lg font-bold ${
+                                  result.score >= 80 ? 'text-sena-green' : 
+                                  result.score >= 60 ? 'text-warning' : 'text-destructive'
+                                }`}>{result.score}%</span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                                  result.level.startsWith('C') ? 'bg-sena-green/10 text-sena-green' :
+                                  result.level.startsWith('B') ? 'bg-sena-blue/10 text-sena-blue' :
+                                  'bg-warning/10 text-warning'
+                                }`}>{result.level}</span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-1 text-sena-green text-sm font-medium">
+                                  <TrendingUp className="w-4 h-4" />
+                                  +{Math.floor(Math.random() * 10) + 1}%
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Actividad reciente */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Actividad por Hora</h3>
+                      <p className="text-sm text-muted-foreground">Pruebas realizadas hoy</p>
+                    </div>
+                  </div>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={[
+                        { hora: '8am', pruebas: 2 },
+                        { hora: '10am', pruebas: 8 },
+                        { hora: '12pm', pruebas: 5 },
+                        { hora: '2pm', pruebas: 12 },
+                        { hora: '4pm', pruebas: 15 },
+                        { hora: '6pm', pruebas: 8 },
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="hora" stroke="#9ca3af" fontSize={12} />
+                        <YAxis stroke="#9ca3af" fontSize={12} />
+                        <Tooltip contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+                        <Line type="monotone" dataKey="pruebas" stroke="#1F4E78" strokeWidth={2} dot={{ fill: '#1F4E78', strokeWidth: 2 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-border shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Recursos mas Usados</h3>
+                      <p className="text-sm text-muted-foreground">Top documentos del mes</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {documents.slice(0, 4).map((doc, i) => (
+                      <div key={doc.id} className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          categoryMeta(doc.category ?? getFileCategory(doc.name)).bg
+                        }`}>
+                          {(() => {
+                            const Icon = categoryMeta(doc.category ?? getFileCategory(doc.name)).icon;
+                            return <Icon className={`w-5 h-5 ${categoryMeta(doc.category ?? getFileCategory(doc.name)).text}`} />;
+                          })()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">{doc.name}</p>
+                          <p className="text-sm text-muted-foreground">{doc.subjectName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-foreground">{Math.floor(Math.random() * 50) + 10}</p>
+                          <p className="text-xs text-muted-foreground">descargas</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -980,26 +1374,77 @@ export function AdminDashboard() {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Asignatura</label>
-                  <select value={uploadForm.subjectId} onChange={(e) => setUploadForm({ ...uploadForm, subjectId: e.target.value })} className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50">
-                    <option value="">Sin asignar</option>
-                    {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Asignatura</label>
+                    <select value={uploadForm.subjectId} onChange={(e) => setUploadForm({ ...uploadForm, subjectId: e.target.value })} className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50">
+                      <option value="">Sin asignar</option>
+                      {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Programa SENA</label>
+                    <select value={uploadForm.program} onChange={(e) => setUploadForm({ ...uploadForm, program: e.target.value })} className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50">
+                      <option value="">Todos los programas</option>
+                      {senaPrograms.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Programa SENA</label>
-                  <select value={uploadForm.program} onChange={(e) => setUploadForm({ ...uploadForm, program: e.target.value })} className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50">
-                    <option value="">Todos los programas</option>
-                    {senaPrograms.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
+
+                {/* Campos Digital Dictionaries */}
+                <div className="border-t border-border pt-4 mt-2">
+                  <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-sena-green" />
+                    Informacion del Diccionario Digital
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Definicion</label>
+                      <textarea
+                        value={uploadForm.definition}
+                        onChange={(e) => setUploadForm({ ...uploadForm, definition: e.target.value })}
+                        placeholder="Escribe la definicion del termino o contenido..."
+                        rows={2}
+                        className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Sinonimos</label>
+                      <input
+                        type="text"
+                        value={uploadForm.synonyms}
+                        onChange={(e) => setUploadForm({ ...uploadForm, synonyms: e.target.value })}
+                        placeholder="Separados por comas: palabra1, palabra2, palabra3"
+                        className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Nivel de Dificultad</label>
+                      <select
+                        value={uploadForm.level}
+                        onChange={(e) => setUploadForm({ ...uploadForm, level: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-sena-green/50"
+                      >
+                        <option value="">Seleccionar nivel</option>
+                        <option value="A1">A1 - Principiante</option>
+                        <option value="A2">A2 - Elemental</option>
+                        <option value="B1">B1 - Intermedio</option>
+                        <option value="B2">B2 - Intermedio Alto</option>
+                        <option value="C1">C1 - Avanzado</option>
+                        <option value="C2">C2 - Maestria</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <button type="submit" disabled={!uploadForm.file} className="flex-1 bg-sena-green text-white py-2.5 rounded-xl hover:bg-sena-green-dark transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                     Subir Archivo
                   </button>
-                  <button type="button" onClick={() => { setShowUploadModal(false); setUploadForm({ file: null, subjectId: "", program: "", previewUrl: "" }); }} className="flex-1 bg-muted text-muted-foreground py-2.5 rounded-xl font-medium">
+                  <button type="button" onClick={() => { setShowUploadModal(false); setUploadForm({ file: null, subjectId: "", program: "", previewUrl: "", definition: "", synonyms: "", level: "" }); }} className="flex-1 bg-muted text-muted-foreground py-2.5 rounded-xl font-medium">
                     Cancelar
                   </button>
                 </div>
